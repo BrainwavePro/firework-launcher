@@ -1,0 +1,14 @@
+{
+  "name": "Firework Launcher",
+  "short_name": "Fireworks",
+  "description": "Missile Command reimagined — defend your cities with spectacular fireworks.",
+  "start_url": ".",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#05060f",
+  "theme_color": "#0b0e1a",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
