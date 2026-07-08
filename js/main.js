@@ -41,6 +41,8 @@ class Game {
     this.breakTimer = 0;
     this.shake = 0;
     this.flash = 0;
+    this.whiteFlash = 0;
+    this.nukeTimer = 0;
     this.stars = [];
 
     this.resize();
@@ -280,6 +282,15 @@ class Game {
     this.ps.update(dt);
     this.shake = Math.max(0, this.shake - dt);
     this.flash = Math.max(0, this.flash - dt * 1.4);
+    this.whiteFlash = Math.max(0, this.whiteFlash - dt * 0.9);
+    if (this.nukeTimer > 0) {
+      this.nukeTimer -= dt;
+      if (this.nukeTimer <= 0) {
+        this.whiteFlash = 1.3;
+        this.shake = 0.9;
+        if (navigator.vibrate) navigator.vibrate(250);
+      }
+    }
 
     // Shells → bursts
     for (let i = this.shells.length - 1; i >= 0; i--) {
@@ -287,7 +298,11 @@ class Game {
       sh.update(dt, this.ps);
       if (sh.arrived) {
         this.shells.splice(i, 1);
-        this.bursts.push(new Burst(sh.type, sh.tx, sh.ty, this.ps, this.audio));
+        this.bursts.push(
+          new Burst(sh.type, sh.tx, sh.ty, this.ps, this.audio, { W: this.W, H: this.H })
+        );
+        // Nuke screen effects fire when the delayed blast zone goes off.
+        if (sh.type.id === 'diablo') this.nukeTimer = 0.95;
       }
     }
 
@@ -391,6 +406,11 @@ class Game {
     // Damage flash
     if (this.flash > 0) {
       ctx.fillStyle = `rgba(255, 60, 40, ${this.flash * 0.35})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+    // Nuke flash
+    if (this.whiteFlash > 0) {
+      ctx.fillStyle = `rgba(255, 250, 235, ${Math.min(1, this.whiteFlash) * 0.9})`;
       ctx.fillRect(0, 0, W, H);
     }
   }

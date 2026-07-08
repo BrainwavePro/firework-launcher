@@ -16,11 +16,12 @@ dependencies, zero build step. Installable to your home screen as a PWA.
   | Firework | Behavior | Unlocks |
   |---|---|---|
   | 🌸 **Peony** | Classic sphere burst, unlimited ammo | Wave 1 |
-  | 🌿 **Willow** | Golden drooping trails that *linger* — catches missiles flying through | Wave 1 |
+  | 🌿 **Willow** | Big golden bloom whose drooping trails form a lingering *curtain* below — guards a column of sky for 3 seconds | Wave 1 |
   | 💠 **Ring** | Expanding shockwave — huge reach, but only kills along the edge | Wave 2 |
-  | 🌴 **Palm** | Comet that splits into five secondary bursts | Wave 3 |
-  | ✨ **Crackle** | Strobing cluster of random micro-bursts | Wave 4 |
-  | 🌌 **Chrysanthemum** | Giant slow bloom — the biggest radius, scarce ammo | Wave 5 |
+  | 🌴 **Palm** | Comet that splits into five far-reaching secondary bursts | Wave 3 |
+  | ✨ **Crackle** | Strobing micro-bursts scattered across a Ring-sized footprint | Wave 4 |
+  | 🌌 **Chrysanthemum** | Giant layered bloom — violet-to-magenta shell, gold pistil, lingering sparkles | Wave 5 |
+  | 😈 **El Diablo** | A tiny loud boom… then a nuclear blast that wipes the whole screen. One per wave | Wave 10 |
 
 - Destroyed missiles pop with a small **sympathetic burst** — chain them!
 - Combo kills from a single burst score bonus points; surviving cities pay a

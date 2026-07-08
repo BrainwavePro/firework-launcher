@@ -24,9 +24,9 @@ export class AudioFX {
     if (this.ctx.state === 'suspended') this.ctx.resume();
   }
 
-  _noise(dur, filterType, f0, f1, vol) {
+  _noise(dur, filterType, f0, f1, vol, delay = 0) {
     if (!this.ctx) return;
-    const t = this.ctx.currentTime;
+    const t = this.ctx.currentTime + delay;
     const src = this.ctx.createBufferSource();
     src.buffer = this.noiseBuf;
     src.loop = true;
@@ -68,6 +68,23 @@ export class AudioFX {
       case 'bigboom':
         this._noise(0.9, 'lowpass', 1400, 90, 0.5);
         this._tone(0.7, 'sine', 90, 32, 0.4);
+        break;
+      case 'chrysboom':
+        this._noise(0.9, 'lowpass', 1400, 90, 0.5);
+        this._tone(0.7, 'sine', 90, 32, 0.4);
+        // Crackle tail as the sparkles strobe.
+        for (let i = 0; i < 8; i++) {
+          this._noise(0.07, 'highpass', 2500, 4000, 0.12, 0.35 + i * 0.13 + Math.random() * 0.05);
+        }
+        break;
+      case 'diabloPop':
+        this._noise(0.08, 'bandpass', 1400, 500, 0.5);
+        this._tone(0.1, 'square', 420, 180, 0.15);
+        break;
+      case 'diabloBoom':
+        this._noise(2.6, 'lowpass', 900, 30, 0.9);
+        this._tone(2.2, 'sine', 55, 22, 0.6);
+        this._tone(1.4, 'sawtooth', 42, 20, 0.2, 0.1);
         break;
       case 'ring':
         this._noise(0.5, 'lowpass', 1000, 120, 0.3);

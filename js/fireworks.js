@@ -34,15 +34,30 @@ export const FIREWORK_TYPES = {
 
   willow: {
     id: 'willow', name: 'Willow', hue: 45,
-    cooldown: 0.5, ammo: 6, unlockWave: 1, sound: 'boom',
-    desc: 'Drooping golden trails that linger',
+    cooldown: 0.6, ammo: 5, unlockWave: 1, sound: 'boom',
+    desc: 'Golden curtain that guards a column of sky',
     zones(x, y) {
-      return [zone('circle', x, y, { r: 60, delay: 0, life: 2.3 })];
+      return [
+        zone('circle', x, y, { r: 90, delay: 0, life: 3.0 }),
+        // The drooping trails keep killing below the burst point.
+        zone('circle', x, y + 55, { r: 70, delay: 0.9, life: 2.0, tag: 'curtain' }),
+      ];
     },
     onZone(ps, z) {
-      ps.burst(70, z.x, z.y, 30, 190, {
-        hue: this.hue, life: rand(2.0, 2.6), size: 1.8,
-        gravity: 120, drag: 0.95, streak: true, flicker: 0.35, fade: 1.1,
+      if (z.tag === 'curtain') {
+        // Gold shimmer marking the falling curtain.
+        ps.burst(22, z.x, z.y, 5, 45, {
+          hue: this.hue, sat: 70, lum: 78, life: 1.7, size: 1.5,
+          gravity: 65, drag: 0.4, flicker: 0.65,
+        });
+        return;
+      }
+      ps.burst(110, z.x, z.y, 30, 260, {
+        hue: this.hue, life: rand(2.6, 3.4), size: 1.9,
+        gravity: 130, drag: 0.95, streak: true, flicker: 0.35, fade: 1.1,
+      });
+      ps.burst(25, z.x, z.y, 15, 80, {
+        hue: this.hue, sat: 35, lum: 92, life: 0.6, size: 2.4, gravity: 40, drag: 0.6,
       });
     },
   },
@@ -78,7 +93,7 @@ export const FIREWORK_TYPES = {
       const fan = [-162, -126, -90, -54, -18];
       for (const deg of fan) {
         const a = (deg * Math.PI) / 180;
-        zs.push(zone('circle', x + Math.cos(a) * 82, y + Math.sin(a) * 82, {
+        zs.push(zone('circle', x + Math.cos(a) * 100, y + Math.sin(a) * 100 - 12, {
           r: 46, delay: 0.35, life: 0.8, frond: a,
         }));
       }
@@ -117,14 +132,14 @@ export const FIREWORK_TYPES = {
   crackle: {
     id: 'crackle', name: 'Crackle', hue: 55,
     cooldown: 0.7, ammo: 4, unlockWave: 4, sound: 'crackle',
-    desc: 'Strobing cluster of micro-bursts',
+    desc: 'Strobing micro-bursts across a huge footprint',
     zones(x, y) {
       const zs = [];
-      for (let i = 0; i < 9; i++) {
+      for (let i = 0; i < 12; i++) {
         const a = Math.random() * TAU;
-        const d = i === 0 ? 0 : rand(20, 95);
+        const d = i === 0 ? 0 : rand(25, 150);
         zs.push(zone('circle', x + Math.cos(a) * d, y + Math.sin(a) * d, {
-          r: 32, delay: i * 0.11, life: 0.35,
+          r: 36, delay: i * 0.1, life: 0.35,
         }));
       }
       return zs;
@@ -139,24 +154,122 @@ export const FIREWORK_TYPES = {
 
   chrys: {
     id: 'chrys', name: 'Chrys', hue: 265,
-    cooldown: 1.6, ammo: 2, unlockWave: 5, sound: 'bigboom',
-    desc: 'Giant slow bloom — huge radius',
+    cooldown: 1.6, ammo: 2, unlockWave: 5, sound: 'chrysboom',
+    desc: 'Giant layered bloom — huge radius',
     zones(x, y) {
       return [zone('circle', x, y, { r: 135, delay: 0, life: 1.25 })];
     },
     onZone(ps, z) {
-      ps.burst(130, z.x, z.y, 60, 330, {
-        hue: this.hue, life: rand(1.1, 1.5), size: 2.3,
-        gravity: 45, drag: 1.0, streak: true, glow: true,
+      // Pressure-wave glow ring racing ahead of the bloom.
+      ps.burst(12, z.x, z.y, 280, 320, {
+        hue: this.hue, sat: 40, lum: 85, life: 0.45, size: 6,
+        gravity: 0, drag: 0.2, glow: true, fade: 2.6,
       });
-      ps.burst(50, z.x, z.y, 20, 140, {
-        hue: this.hue, sat: 25, lum: 92, life: 0.8, size: 2.2, gravity: 30, drag: 0.7,
+      // Main shell with hue drift: violet core → magenta rim.
+      for (let i = 0; i < 140; i++) {
+        const a = Math.random() * TAU;
+        const v = rand(60, 330);
+        ps.spawn({
+          x: z.x, y: z.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v,
+          hue: 250 + (v / 330) * 65, life: rand(1.1, 1.5), size: 2.3,
+          gravity: 45, drag: 1.0, streak: true, glow: true,
+        });
+      }
+      // Gold pistil ring inside the bloom.
+      ps.burst(45, z.x, z.y, 40, 115, {
+        hue: 48, life: rand(0.9, 1.3), size: 2, gravity: 55, drag: 0.8, streak: true,
       });
+      // White core flash.
+      ps.burst(30, z.x, z.y, 10, 90, {
+        hue: this.hue, sat: 15, lum: 96, life: 0.5, size: 3, gravity: 20, drag: 0.6, glow: true,
+      });
+      // Lingering sparkle strobes that outlive the main shell.
+      for (let i = 0; i < 25; i++) {
+        const a = Math.random() * TAU;
+        const d = rand(20, 125);
+        ps.spawn({
+          x: z.x + Math.cos(a) * d, y: z.y + Math.sin(a) * d,
+          vx: rand(-15, 15), vy: rand(-5, 25),
+          hue: 55, sat: 50, lum: 90, life: rand(1.5, 2.3), size: 1.6,
+          gravity: 35, drag: 0.5, flicker: 0.85,
+        });
+      }
+    },
+  },
+
+  diablo: {
+    id: 'diablo', name: 'Diablo', hue: 12,
+    cooldown: 2, ammo: 1, unlockWave: 10, sound: 'boom',
+    desc: 'A tiny boom. Then the sun.',
+    zones(x, y, bounds) {
+      const W = bounds?.W ?? 900;
+      const H = bounds?.H ?? 900;
+      const rMax = Math.hypot(W, H) * 1.05;
+      return [
+        zone('circle', x, y, { r: 24, delay: 0, life: 0.25, sound: 'diabloPop', tag: 'pop' }),
+        zone('grow', x, y, { r0: 30, r1: rMax, delay: 0.95, life: 1.1, sound: 'diabloBoom', tag: 'nuke' }),
+        // Zero-radius zone only keeps the burst alive for the ember plume.
+        zone('circle', x, y, { r: 0, delay: 2.05, life: 1.1, sound: null, tag: 'plume' }),
+      ];
+    },
+    onZone(ps, z) {
+      if (z.tag === 'pop') {
+        ps.burst(14, z.x, z.y, 30, 120, {
+          hue: this.hue, sat: 30, lum: 95, life: 0.3, size: 2, gravity: 20, drag: 0.5, glow: true,
+        });
+        return;
+      }
+      if (z.tag === 'plume') {
+        for (let i = 0; i < 45; i++) {
+          ps.spawn({
+            x: z.x + rand(-70, 70), y: z.y + rand(-30, 30),
+            vx: rand(-25, 25), vy: rand(-90, -20),
+            hue: rand(8, 35), life: rand(1.0, 2.0), size: rand(2, 4),
+            gravity: -25, drag: 0.8, flicker: 0.5, glow: true,
+          });
+        }
+        return;
+      }
+      // Detonation core.
+      ps.burst(120, z.x, z.y, 100, 700, {
+        hue: 18, life: rand(0.8, 1.4), size: 3,
+        gravity: -20, drag: 1.6, streak: true, glow: true,
+      });
+      ps.burst(60, z.x, z.y, 30, 220, {
+        hue: 45, sat: 40, lum: 92, life: 0.7, size: 4, gravity: -40, drag: 1.2, glow: true,
+      });
+    },
+    // Fire riding the expanding shock front, plus interior churn.
+    tick(ps, burst) {
+      const z = burst.zones[1];
+      const t = (burst.age - z.delay) / z.life;
+      if (t <= 0 || t >= 1) return;
+      const r = z.r0 + (z.r1 - z.r0) * t;
+      for (let i = 0; i < 20; i++) {
+        const a = Math.random() * TAU;
+        const d = r * rand(0.85, 1);
+        ps.spawn({
+          x: z.x + Math.cos(a) * d, y: z.y + Math.sin(a) * d,
+          vx: Math.cos(a) * 130, vy: Math.sin(a) * 130 - 30,
+          hue: rand(8, 32), life: rand(0.4, 0.9), size: rand(2.5, 4.5),
+          gravity: -30, drag: 1.0, glow: true, flicker: 0.3,
+        });
+      }
+      for (let i = 0; i < 8; i++) {
+        const a = Math.random() * TAU;
+        const d = r * Math.random() * 0.8;
+        ps.spawn({
+          x: z.x + Math.cos(a) * d, y: z.y + Math.sin(a) * d,
+          vx: rand(-40, 40), vy: rand(-60, 10),
+          hue: rand(15, 45), sat: 80, lum: rand(60, 90),
+          life: rand(0.3, 0.7), size: rand(2, 5), gravity: -20, drag: 0.8, glow: true,
+        });
+      }
     },
   },
 };
 
-export const TYPE_ORDER = ['peony', 'willow', 'ring', 'palm', 'crackle', 'chrys'];
+export const TYPE_ORDER = ['peony', 'willow', 'ring', 'palm', 'crackle', 'chrys', 'diablo'];
 
 // Small sympathetic pop left behind by a destroyed missile (chain reactions).
 export const POP_TYPE = {
@@ -181,14 +294,14 @@ function zone(kind, x, y, props) {
 // ---------------------------------------------------------------------------
 
 export class Burst {
-  constructor(type, x, y, ps, audio) {
+  constructor(type, x, y, ps, audio, bounds) {
     this.type = type;
     this.x = x;
     this.y = y;
     this.ps = ps;
     this.audio = audio;
     this.age = 0;
-    this.zones = type.zones(x, y);
+    this.zones = type.zones(x, y, bounds);
     this.kills = 0;
     this.done = false;
   }
@@ -201,7 +314,8 @@ export class Burst {
       if (!z.started && this.age >= z.delay) {
         z.started = true;
         this.type.onZone(this.ps, z, this);
-        if (this.audio) this.audio.zone(this.type.sound, z === this.zones[0]);
+        const snd = z.sound !== undefined ? z.sound : this.type.sound;
+        if (this.audio && snd) this.audio.zone(snd, z === this.zones[0]);
       }
       if (this.age < z.delay + z.life) alive = true;
     }
@@ -217,6 +331,10 @@ export class Burst {
       if (!this.zoneActive(z)) continue;
       if (z.kind === 'circle') {
         if (inCircle(px, py, z.x, z.y, z.r)) return true;
+      } else if (z.kind === 'grow') {
+        const t = (this.age - z.delay) / z.life;
+        const r = z.r0 + (z.r1 - z.r0) * t;
+        if (inCircle(px, py, z.x, z.y, r)) return true;
       } else if (z.kind === 'ring') {
         const t = (this.age - z.delay) / z.life;
         const r = z.r0 + (z.r1 - z.r0) * t;
