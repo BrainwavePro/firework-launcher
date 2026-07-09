@@ -28,14 +28,20 @@ dependencies, zero build step. Installable to your home screen as a PWA.
   bonus every wave.
 - Watch out for **MIRVs** that split mid-air (wave 3+) and weaving **smart
   missiles** (wave 5+). Batteries are rebuilt between waves; cities are not.
-- Game over when every city has fallen. Best score is saved on your device.
+- Game over when every city has fallen. Make the **top-10 leaderboard** and
+  enter your initials, arcade style — scores persist on your device.
+- **Keyboard shortcuts** (desktop): **1–7** select a firework, **←/→** (or
+  **Q/E**) cycle through unlocked types, **M** cycles the music.
+- **Retro music**: three procedurally generated chiptune tracks — *Neon
+  Siege*, *Quarter Muncher*, *Starlight Vigil* — pick one (or silence) from
+  the menu. Synthesized live with Web Audio; no audio files.
 
 ## Run it
 
 Any static file server works:
 
 ```sh
-python3 -m http.server 8000
+python -m http.server 8000
 # then open http://localhost:8000 (best on a phone / mobile viewport)
 ```
 
@@ -53,7 +59,9 @@ js/world.js         cities, batteries, enemy missiles, wave difficulty
 js/particles.js     pooled additive-blend particle system
 js/collision.js     circle / ring hit tests
 js/audio.js         procedural Web Audio SFX (no assets)
-js/ui.js            HUD, selector, menu/game-over screens
-js/input.js         pointer/touch handling
+js/music.js         procedural chiptune engine + track data
+js/scores.js        persistent top-10 leaderboard (localStorage)
+js/ui.js            HUD, selector, menus, leaderboard, music picker
+js/input.js         pointer/touch + keyboard shortcuts
 sw.js               offline cache (PWA)
 ```
