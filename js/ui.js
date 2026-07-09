@@ -15,12 +15,13 @@ export class UI {
     this.buttons = {};
     this.bannerTimer = 0;
 
-    for (const t of types) {
+    types.forEach((t, i) => {
       const btn = document.createElement('button');
       btn.className = 'fw-btn';
       btn.style.setProperty('--c', `hsl(${t.hue} 95% 65%)`);
       btn.dataset.type = t.id;
       btn.innerHTML =
+        `<span class="fw-key">${i + 1}</span>` +
         `<span class="fw-dot"></span>` +
         `<span class="fw-name">${t.name}</span>` +
         `<span class="fw-ammo"></span>`;
@@ -30,7 +31,7 @@ export class UI {
       });
       this.selectorEl.appendChild(btn);
       this.buttons[t.id] = btn;
-    }
+    });
   }
 
   setScore(n) { this.scoreEl.textContent = String(n); }
@@ -63,30 +64,77 @@ export class UI {
     );
   }
 
-  showMenu(high, onStart) {
+  _scoreRows(scores, max = 5, highlight = -1) {
+    if (!scores.length) return '';
+    const rows = scores.slice(0, max).map((s, i) =>
+      `<div class="score-row${i === highlight ? ' me' : ''}">
+        <span class="sr-rank">${i + 1}</span>
+        <span class="sr-init">${s.initials}</span>
+        <span class="sr-score">${s.score}</span>
+        <span class="sr-wave">W${s.wave || '–'}</span>
+      </div>`).join('');
+    return `<div class="scores"><div class="scores-title">HIGH SCORES</div>${rows}</div>`;
+  }
+
+  _musicRow(tracks, currentId) {
+    const btns = tracks.map((t) =>
+      `<button class="mus-btn${t.id === currentId ? ' selected' : ''}"
+        data-music="${t.id}">${t.id === 'off' ? '✕' : '♪'} ${t.name}</button>`).join('');
+    return `<div class="mus-row" id="mus-row">${btns}</div>`;
+  }
+
+  showMenu({ scores, tracks, musicId, onStart, onMusic }) {
     this.overlayEl.innerHTML = `
       <h1>FIREWORK<br>LAUNCHER</h1>
       <p>Missiles are falling on your cities.<br>
       Fight back with <strong>fireworks</strong>.</p>
-      <p>Tap the sky to intercept. Pick your firework from the bar below —
-      each bursts differently. Survive the waves.</p>
-      ${high > 0 ? `<p>Best score: <strong>${high}</strong></p>` : ''}
-      <button class="big-btn" id="btn-start">DEFEND</button>`;
+      <p>Tap the sky to intercept. Keys 1–7 switch fireworks, M cycles music.</p>
+      <button class="big-btn" id="btn-start">DEFEND</button>
+      ${this._musicRow(tracks, musicId)}
+      ${this._scoreRows(scores)}`;
     this.overlayEl.classList.remove('hidden');
     document.getElementById('btn-start')
       .addEventListener('pointerdown', onStart, { once: true });
+    document.getElementById('mus-row').addEventListener('pointerdown', (e) => {
+      const btn = e.target.closest('.mus-btn');
+      if (!btn) return;
+      onMusic(btn.dataset.music);
+      for (const b of this.overlayEl.querySelectorAll('.mus-btn')) {
+        b.classList.toggle('selected', b === btn);
+      }
+    });
   }
 
-  showGameOver(score, high, isRecord, onRestart) {
+  showGameOver({ score, wave, scores, canEnter, onSave, onRestart }) {
+    const entry = canEnter
+      ? `<div class="initials-row" id="initials-row">
+          <input id="initials" maxlength="3" placeholder="AAA"
+            autocomplete="off" autocapitalize="characters" spellcheck="false">
+          <button class="save-btn" id="btn-save-score">SAVE</button>
+        </div>
+        <p class="entry-hint">You made the leaderboard — enter your initials!</p>`
+      : this._scoreRows(scores);
     this.overlayEl.innerHTML = `
       <h2>THE SKY GOES DARK</h2>
-      <p>All cities have fallen.</p>
+      <p>All cities have fallen on wave ${wave}.</p>
       <div class="score-big">${score}</div>
-      <p>${isRecord ? '★ New best score! ★' : `Best: ${high}`}</p>
+      ${entry}
       <button class="big-btn" id="btn-restart">RELIGHT</button>`;
     this.overlayEl.classList.remove('hidden');
     document.getElementById('btn-restart')
       .addEventListener('pointerdown', onRestart, { once: true });
+    if (canEnter) {
+      const input = document.getElementById('initials');
+      input.addEventListener('input', () => {
+        input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      });
+      document.getElementById('btn-save-score').addEventListener('pointerdown', () => {
+        const { list, rank } = onSave(input.value || 'AAA');
+        document.getElementById('initials-row').outerHTML = this._scoreRows(list, 5, rank);
+        const hint = this.overlayEl.querySelector('.entry-hint');
+        if (hint) hint.remove();
+      }, { once: true });
+    }
   }
 
   hideOverlay() {

@@ -1,10 +1,12 @@
 // Minimal cache-first service worker so the game works offline / installs as a PWA.
-const CACHE = 'fw-launcher-v2';
+const CACHE = 'fw-launcher-v3';
 const ASSETS = [
   '.',
   'index.html',
   'css/style.css',
   'js/main.js',
+  'js/music.js',
+  'js/scores.js',
   'js/particles.js',
   'js/collision.js',
   'js/fireworks.js',

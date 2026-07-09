@@ -7,12 +7,14 @@ import {
   makeStructures, EnemyMissile, waveConfig, drawGround,
 } from './world.js';
 import { AudioFX } from './audio.js';
+import { MusicEngine, TRACKS } from './music.js';
+import { loadScores, qualifies, insertScore, best } from './scores.js';
 import { UI } from './ui.js';
-import { bindInput } from './input.js';
+import { bindInput, bindKeyboard } from './input.js';
 
 const TAU = Math.PI * 2;
 const rand = (a, b) => a + Math.random() * (b - a);
-const HIGH_KEY = 'fw-launcher-high';
+const MUSIC_KEY = 'fw-launcher-music';
 
 class Game {
   constructor(canvas) {
@@ -26,7 +28,9 @@ class Game {
     this.state = 'menu';
     this.score = 0;
     this.wave = 1;
-    this.high = Number(localStorage.getItem(HIGH_KEY) || 0);
+    this.scores = loadScores();
+    this.music = new MusicEngine(this.audio);
+    this.musicId = localStorage.getItem(MUSIC_KEY) || 'neon';
     this.selected = 'peony';
     this.ammo = {};
     for (const t of this.types) this.ammo[t.id] = t.ammo;
@@ -48,12 +52,17 @@ class Game {
     this.resize();
     window.addEventListener('resize', () => this.resize());
     bindInput(canvas, (x, y) => this.tap(x, y));
+    bindKeyboard({
+      selectIndex: (i) => this.select(TYPE_ORDER[i]),
+      cycle: (dir) => this.cycleType(dir),
+      cycleMusic: () => this.cycleMusic(),
+    });
     document.addEventListener('pointerdown', () => this.audio.ensure(), { capture: true });
 
-    this.ui.setHigh(this.high);
+    this.ui.setHigh(best(this.scores));
     this.ui.setScore(0);
     this.ui.updateSelector(this.types, this.selState());
-    this.ui.showMenu(this.high, () => this.startGame());
+    this.showMenu();
 
     this.last = performance.now();
     requestAnimationFrame((t) => this.frame(t));
@@ -88,8 +97,41 @@ class Game {
 
   // ------------------------------------------------------------- flow
 
+  showMenu() {
+    this.ui.showMenu({
+      scores: this.scores,
+      tracks: TRACKS,
+      musicId: this.musicId,
+      onStart: () => this.startGame(),
+      onMusic: (id) => this.setMusic(id),
+    });
+  }
+
+  setMusic(id) {
+    this.musicId = id;
+    localStorage.setItem(MUSIC_KEY, id);
+    this.audio.ensure();
+    this.music.setTrack(id);
+  }
+
+  cycleMusic() {
+    const i = TRACKS.findIndex((t) => t.id === this.musicId);
+    const next = TRACKS[(i + 1) % TRACKS.length];
+    this.setMusic(next.id);
+    this.ui.banner(next.id === 'off' ? 'MUSIC OFF' : `♪ ${next.name.toUpperCase()}`, '', 1.2);
+  }
+
+  cycleType(dir) {
+    const unlocked = TYPE_ORDER.filter(
+      (id) => this.wave >= FIREWORK_TYPES[id].unlockWave
+    );
+    const i = unlocked.indexOf(this.selected);
+    this.select(unlocked[(i + dir + unlocked.length) % unlocked.length]);
+  }
+
   startGame() {
     this.audio.ensure();
+    this.music.setTrack(this.musicId);
     this.score = 0;
     this.structures = makeStructures();
     this.shells = [];
@@ -133,15 +175,24 @@ class Game {
 
   gameOver() {
     this.state = 'gameover';
+    this.music.stop();
     this.audio.gameOver();
-    const isRecord = this.score > this.high;
-    if (isRecord) {
-      this.high = this.score;
-      localStorage.setItem(HIGH_KEY, String(this.high));
-      this.ui.setHigh(this.high);
-    }
     setTimeout(() => {
-      this.ui.showGameOver(this.score, this.high, isRecord, () => this.startGame());
+      this.ui.showGameOver({
+        score: this.score,
+        wave: this.wave,
+        scores: this.scores,
+        canEnter: qualifies(this.scores, this.score),
+        onSave: (initials) => {
+          const entry = {
+            initials, score: this.score, wave: this.wave, date: Date.now(),
+          };
+          this.scores = insertScore(this.scores, entry);
+          this.ui.setHigh(best(this.scores));
+          return { list: this.scores, rank: this.scores.indexOf(entry) };
+        },
+        onRestart: () => this.startGame(),
+      });
     }, 900);
   }
 
