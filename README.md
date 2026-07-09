@@ -41,7 +41,7 @@ dependencies, zero build step. Installable to your home screen as a PWA.
 Any static file server works:
 
 ```sh
-python3 -m http.server 8000
+python -m http.server 8000
 # then open http://localhost:8000 (best on a phone / mobile viewport)
 ```
 
