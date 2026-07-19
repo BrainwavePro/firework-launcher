@@ -4,7 +4,7 @@
 import { ParticleSystem } from './particles.js';
 import { FIREWORK_TYPES, TYPE_ORDER, POP_TYPE, Shell, Burst } from './fireworks.js';
 import {
-  makeStructures, EnemyMissile, waveConfig, drawGround,
+  makeStructures, EnemyMissile, Boss, waveConfig, drawGround,
 } from './world.js';
 import { AudioFX } from './audio.js';
 import { MusicEngine, TRACKS } from './music.js';
@@ -15,6 +15,14 @@ import { bindInput, bindKeyboard } from './input.js';
 const TAU = Math.PI * 2;
 const rand = (a, b) => a + Math.random() * (b - a);
 const MUSIC_KEY = 'fw-launcher-music';
+
+// Wave-break banner subtitles the first time an enemy kind appears.
+const ENEMY_INTROS = {
+  3: 'NEW THREAT: MIRV',
+  4: 'NEW THREAT: ARMORED',
+  5: 'NEW THREAT: SMART',
+  6: 'NEW THREAT: BOMBER',
+};
 
 class Game {
   constructor(canvas) {
@@ -43,6 +51,9 @@ class Game {
     this.spawnTimer = 0;
     this.waveCfg = waveConfig(1);
     this.breakTimer = 0;
+    this.boss = null;
+    this.bossPending = 0;
+    this.stats = { fired: 0, kills: 0 };
     this.shake = 0;
     this.flash = 0;
     this.whiteFlash = 0;
@@ -137,6 +148,9 @@ class Game {
     this.shells = [];
     this.bursts = [];
     this.missiles = [];
+    this.boss = null;
+    this.bossPending = 0;
+    this.stats = { fired: 0, kills: 0 };
     this.ps.clear();
     this.selected = 'peony';
     this.ui.setScore(0);
@@ -157,10 +171,15 @@ class Game {
     this.ui.setWave(n);
     this.ui.updateSelector(this.types, this.selState());
     const unlockedNow = this.types.find((t) => t.unlockWave === n && n > 1);
-    this.ui.banner(
-      `WAVE ${n}`,
-      unlockedNow ? `NEW FIREWORK UNLOCKED: ${unlockedNow.name.toUpperCase()}` : ''
-    );
+    let sub = unlockedNow
+      ? `NEW FIREWORK UNLOCKED: ${unlockedNow.name.toUpperCase()}`
+      : ENEMY_INTROS[n] || '';
+    if (this.waveCfg.boss) {
+      sub = 'MOTHERSHIP DETECTED';
+      this.bossPending = 2;
+      this.audio.bossAlarm();
+    }
+    this.ui.banner(`WAVE ${n}`, sub);
   }
 
   waveCleared() {
@@ -182,6 +201,7 @@ class Game {
         score: this.score,
         wave: this.wave,
         scores: this.scores,
+        stats: this.stats,
         canEnter: qualifies(this.scores, this.score),
         onSave: (initials) => {
           const entry = {
@@ -224,6 +244,7 @@ class Game {
     const ty = Math.min(Math.max(y, 30), this.groundY - 40);
     this.lastFire[type.id] = now;
     this.ammo[type.id] -= 1;
+    this.stats.fired += 1;
     this.shells.push(
       new Shell(type, battery.x, this.groundY - 15, x, ty, this.H * 1.05)
     );
@@ -247,18 +268,37 @@ class Game {
   spawnMissile() {
     const targets = this.structures.filter((s) => s.alive);
     if (!targets.length) return;
-    const target = targets[Math.floor(Math.random() * targets.length)];
+    const c = this.waveCfg;
     const roll = Math.random();
+    let acc = 0;
     const kind =
-      roll < this.waveCfg.smartChance ? 'smart'
-      : roll < this.waveCfg.smartChance + this.waveCfg.mirvChance ? 'mirv'
+      roll < (acc += c.smartChance) ? 'smart'
+      : roll < (acc += c.mirvChance) ? 'mirv'
+      : roll < (acc += c.armorChance) ? 'armor'
+      : roll < (acc += c.bomberChance) ? 'bomber'
       : 'normal';
+    if (kind === 'bomber') {
+      // Bombers cross the top of the screen and escape out the far side.
+      const fromLeft = Math.random() < 0.5;
+      const sy = rand(0.10, 0.20) * this.H;
+      this.missiles.push(
+        new EnemyMissile({
+          sx: fromLeft ? -30 : this.W + 30,
+          sy,
+          target: { x: fromLeft ? this.W + 30 : -30, y: sy, ref: null },
+          speed: c.speedFrac * this.H * 0.75,
+          kind,
+        })
+      );
+      return;
+    }
+    const target = targets[Math.floor(Math.random() * targets.length)];
     this.missiles.push(
       new EnemyMissile({
         sx: rand(20, this.W - 20),
         sy: -10,
         target: { x: target.f * this.W, y: this.groundY, ref: target },
-        speed: this.waveCfg.speedFrac * this.H,
+        speed: c.speedFrac * this.H * (kind === 'armor' ? 0.8 : 1),
         kind,
       })
     );
@@ -286,6 +326,63 @@ class Game {
     });
   }
 
+  dropBomb(m) {
+    // Aim at a structure roughly below the bomber; fall back to any alive one.
+    const near = this.structures.filter(
+      (s) => s.alive && Math.abs(s.f * this.W - m.x) < this.W * 0.3
+    );
+    const pool = near.length ? near : this.structures.filter((s) => s.alive);
+    if (!pool.length) return;
+    const t = pool[Math.floor(Math.random() * pool.length)];
+    this.missiles.push(
+      new EnemyMissile({
+        sx: m.x, sy: m.y,
+        target: { x: t.f * this.W, y: this.groundY, ref: t },
+        speed: this.waveCfg.speedFrac * this.H * 1.2,
+        kind: 'normal',
+        hue: 50,
+      })
+    );
+    this.audio.bombDrop();
+  }
+
+  bossSalvo(boss) {
+    const targets = this.structures.filter((s) => s.alive);
+    if (!targets.length) return;
+    for (let i = 0; i < boss.salvoSize; i++) {
+      const t = targets[Math.floor(Math.random() * targets.length)];
+      const smart = this.wave >= 10 && Math.random() < 0.5;
+      this.missiles.push(
+        new EnemyMissile({
+          sx: boss.x + rand(-20, 20),
+          sy: boss.y + 14,
+          target: { x: t.f * this.W, y: this.groundY, ref: t },
+          speed: this.waveCfg.speedFrac * this.H * 1.1,
+          kind: smart ? 'smart' : 'normal',
+        })
+      );
+    }
+    this.audio.launch();
+  }
+
+  bossDown(boss) {
+    this.boss = null;
+    this.stats.kills += 1;
+    this.addScore(boss.value);
+    this.audio.bossDown();
+    this.whiteFlash = 0.7;
+    this.shake = 0.8;
+    if (navigator.vibrate) navigator.vibrate(200);
+    this.ps.burst(150, boss.x, boss.y, 60, 420, {
+      hue: 350, life: rand(0.8, 1.6), size: 2.6, gravity: 60, drag: 0.8,
+      streak: true, glow: true,
+    });
+    this.ps.burst(40, boss.x, boss.y, 20, 150, {
+      hue: 48, sat: 40, lum: 92, life: 0.6, size: 3, gravity: 30, drag: 0.6, glow: true,
+    });
+    this.ui.banner('MOTHERSHIP DOWN', `+${boss.value}`, 2.2);
+  }
+
   impact(m) {
     const ref = m.target.ref;
     if (ref && ref.alive) {
@@ -311,7 +408,8 @@ class Game {
   killMissile(i, burst) {
     const m = this.missiles[i];
     this.missiles.splice(i, 1);
-    const pts = 100 + (burst ? burst.kills * 50 : 0);
+    this.stats.kills += 1;
+    const pts = m.value + (burst ? burst.kills * 50 : 0);
     if (burst) burst.kills += 1;
     this.addScore(pts * this.wave);
     // Sympathetic pop: chain reactions off a destroyed warhead.
@@ -350,7 +448,12 @@ class Game {
       if (sh.arrived) {
         this.shells.splice(i, 1);
         this.bursts.push(
-          new Burst(sh.type, sh.tx, sh.ty, this.ps, this.audio, { W: this.W, H: this.H })
+          new Burst(sh.type, sh.tx, sh.ty, this.ps, this.audio, {
+            W: this.W,
+            H: this.H,
+            getTargets: () =>
+              this.boss ? [...this.missiles, this.boss] : this.missiles,
+          })
         );
         // Nuke screen effects fire when the delayed blast zone goes off.
         if (sh.type.id === 'diablo') this.nukeTimer = 0.95;
@@ -375,22 +478,60 @@ class Game {
         }
       }
 
-      // Missiles: move, split, collide, impact
+      // Boss: descend, strafe, salvo, take damage
+      if (this.bossPending > 0) {
+        this.bossPending -= dt;
+        if (this.bossPending <= 0) {
+          this.boss = new Boss({ ...this.waveCfg.boss, W: this.W, H: this.H });
+        }
+      }
+      if (this.boss) {
+        const boss = this.boss;
+        if (boss.update(dt, this.W) === 'salvo') this.bossSalvo(boss);
+        for (const b of this.bursts) {
+          if (boss.hitBursts.has(b) || !b.hitsCircle(boss.x, boss.y, boss.r)) continue;
+          boss.hitBursts.add(b);
+          boss.hp -= b.type.power ?? 1;
+          if (boss.hp <= 0) {
+            this.bossDown(boss);
+            break;
+          }
+          boss.hitFlash = 0.15;
+          this.audio.bossHit();
+          this.ps.burst(16, boss.x, boss.y + 10, 40, 160, {
+            hue: 350, sat: 60, lum: 80, life: 0.35, size: 1.8, gravity: 80, drag: 0.5,
+          });
+        }
+      }
+
+      // Missiles: move, split/drop, collide, impact
       for (let i = this.missiles.length - 1; i >= 0; i--) {
         const m = this.missiles[i];
-        const wantsSplit = m.update(dt);
-        if (wantsSplit) this.splitMirv(m);
+        const act = m.update(dt);
+        if (act === 'split') this.splitMirv(m);
+        else if (act === 'drop') this.dropBomb(m);
         let killed = false;
         for (const b of this.bursts) {
-          if (b.hits(m.x, m.y)) {
+          // Each burst damages a given missile at most once, so lingering
+          // blast zones don't melt armored targets in a single frame.
+          if (m.hitBursts.has(b) || !b.hits(m.x, m.y)) continue;
+          m.hitBursts.add(b);
+          m.hp -= b.type.power ?? 1;
+          if (m.hp <= 0) {
             this.killMissile(i, b);
             killed = true;
             break;
           }
+          m.damaged = true;
+          this.audio.armorClank();
+          this.ps.burst(12, m.x, m.y, 30, 140, {
+            hue: 210, sat: 30, lum: 85, life: 0.3, size: 1.6, gravity: 60, drag: 0.5,
+          });
         }
         if (killed) continue;
         if (m.impacted) {
           this.missiles.splice(i, 1);
+          if (m.kind === 'bomber') continue; // escaped off-screen, no ground hit
           this.impact(m);
           if (this.state !== 'playing') return;
         }
@@ -401,7 +542,9 @@ class Game {
         this.spawnLeft === 0 &&
         this.missiles.length === 0 &&
         this.shells.length === 0 &&
-        this.bursts.length === 0
+        this.bursts.length === 0 &&
+        !this.boss &&
+        this.bossPending <= 0
       ) {
         this.waveCleared();
       }
@@ -448,11 +591,33 @@ class Game {
 
     // Entities
     for (const m of this.missiles) m.draw(ctx);
+    if (this.boss) this.boss.draw(ctx);
     for (const sh of this.shells) sh.draw(ctx);
     this.ps.draw(ctx);
     drawGround(ctx, W, H, this.groundY, this.structures);
 
     ctx.restore();
+
+    // Boss health bar (below the DOM HUD, unaffected by screen shake).
+    if (this.boss) {
+      const bw = Math.min(320, W * 0.72);
+      const bx = (W - bw) / 2;
+      const by = 58;
+      const bh = 8;
+      ctx.fillStyle = 'rgba(10, 14, 36, 0.8)';
+      ctx.fillRect(bx - 2, by - 2, bw + 4, bh + 4);
+      ctx.fillStyle = 'hsl(350 90% 60%)';
+      ctx.fillRect(bx, by, bw * (this.boss.hp / this.boss.maxHp), bh);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+      ctx.lineWidth = 1;
+      for (let i = 1; i < this.boss.maxHp; i++) {
+        const x = Math.round(bx + (bw * i) / this.boss.maxHp) + 0.5;
+        ctx.beginPath();
+        ctx.moveTo(x, by);
+        ctx.lineTo(x, by + bh);
+        ctx.stroke();
+      }
+    }
 
     // Damage flash
     if (this.flash > 0) {

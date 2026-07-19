@@ -88,7 +88,7 @@ export class UI {
       <h1>FIREWORK<br>LAUNCHER</h1>
       <p>Missiles are falling on your cities.<br>
       Fight back with <strong>fireworks</strong>.</p>
-      <p>Tap the sky to intercept. Keys 1–7 switch fireworks, M cycles music.</p>
+      <p>Tap the sky to intercept. Keys 1–9 switch fireworks, M cycles music.</p>
       <button class="big-btn" id="btn-start">DEFEND</button>
       ${this._musicRow(tracks, musicId)}
       ${this._scoreRows(scores)}`;
@@ -105,7 +105,11 @@ export class UI {
     });
   }
 
-  showGameOver({ score, wave, scores, canEnter, onSave, onRestart }) {
+  showGameOver({ score, wave, scores, stats, canEnter, onSave, onRestart }) {
+    const acc = stats && stats.fired ? Math.round((stats.kills / stats.fired) * 100) : 0;
+    const statsLine = stats
+      ? `<p>FIRED ${stats.fired} · KILLS ${stats.kills} · ACCURACY ${acc}%</p>`
+      : '';
     const entry = canEnter
       ? `<div class="initials-row" id="initials-row">
           <input id="initials" maxlength="3" placeholder="AAA"
@@ -118,6 +122,7 @@ export class UI {
       <h2>THE SKY GOES DARK</h2>
       <p>All cities have fallen on wave ${wave}.</p>
       <div class="score-big">${score}</div>
+      ${statsLine}
       ${entry}
       <button class="big-btn" id="btn-restart">RELIGHT</button>`;
     this.overlayEl.classList.remove('hidden');

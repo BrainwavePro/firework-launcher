@@ -94,6 +94,14 @@ export class AudioFX {
         this._noise(0.09, 'highpass', 2500, 4000, first ? 0.3 : 0.18);
         if (first) this._tone(0.3, 'sine', 120, 50, 0.2);
         break;
+      case 'curtain':
+        if (first) this._noise(0.5, 'lowpass', 900, 100, 0.3);
+        this._noise(0.08, 'highpass', 1800, 3200, 0.12);
+        break;
+      case 'seeker':
+        this._tone(0.3, 'sawtooth', 500, 1400, 0.07);
+        this._noise(0.25, 'bandpass', 800, 2200, 0.06);
+        break;
       case 'pop':
         this._noise(0.12, 'bandpass', 900, 300, 0.15);
         break;
@@ -107,6 +115,32 @@ export class AudioFX {
   cityHit() {
     this._noise(1.0, 'lowpass', 400, 40, 0.55);
     this._tone(0.9, 'sawtooth', 70, 24, 0.22);
+  }
+
+  /** Metallic "it didn't die" clank when a blast fails to crack armor. */
+  armorClank() {
+    this._noise(0.12, 'bandpass', 2600, 700, 0.3);
+    this._tone(0.15, 'square', 220, 90, 0.15);
+  }
+
+  bombDrop() {
+    this._tone(0.6, 'sine', 1500, 400, 0.05);
+  }
+
+  bossAlarm() {
+    [392, 523, 392, 523].forEach((f, i) => this._tone(0.26, 'square', f, f, 0.12, i * 0.3));
+  }
+
+  bossHit() {
+    this._noise(0.2, 'lowpass', 700, 120, 0.3);
+    this._tone(0.15, 'triangle', 160, 70, 0.18);
+  }
+
+  bossDown() {
+    this._noise(2.0, 'lowpass', 1000, 40, 0.8);
+    this._tone(1.6, 'sine', 60, 24, 0.5);
+    // Victory arpeggio once the rumble fades.
+    [659, 784, 1047].forEach((f, i) => this._tone(0.2, 'triangle', f, f, 0.12, 0.9 + i * 0.12));
   }
 
   waveClear() {
