@@ -28,6 +28,9 @@ dependencies, zero build step. Installable to your home screen as a PWA.
 - Destroyed missiles pop with a small **sympathetic burst** — chain them!
 - Combo kills from a single burst score bonus points; surviving cities pay a
   bonus every wave.
+- Kill streaks build a **×2/×3/×4 score multiplier** that resets the moment
+  any city or battery falls; clearing a wave untouched pays a **PERFECT**
+  bonus. Difficulty keeps climbing forever — there is no final wave.
 - Watch out for **MIRVs** that split mid-air (wave 3+), steel-blue **armored
   missiles** that need two separate blasts (wave 4+), weaving **smart
   missiles** (wave 5+), and **bombers** that cross the top of the screen

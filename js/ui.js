@@ -38,6 +38,16 @@ export class UI {
   setWave(n) { this.waveEl.textContent = `WAVE ${n}`; }
   setHigh(n) { this.highEl.textContent = `BEST ${n}`; }
 
+  setCombo(mult) {
+    const el = document.getElementById('hud-combo');
+    el.textContent = `×${mult}`;
+    el.classList.toggle('hidden', mult < 2);
+    // Retrigger the pop animation on tier change.
+    el.style.animation = 'none';
+    void el.offsetWidth;
+    el.style.animation = '';
+  }
+
   updateSelector(types, state) {
     for (const t of types) {
       const btn = this.buttons[t.id];

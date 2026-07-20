@@ -72,6 +72,26 @@ html, body {
 }
 #btn-pause.hidden { display: none; }
 
+/* ---------- Combo badge ---------- */
+#hud-combo {
+  position: fixed;
+  left: 14px;
+  top: calc(40px + var(--safe-top));
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #ffd77a;
+  text-shadow: 0 0 12px rgba(255, 200, 100, 0.75);
+  pointer-events: none;
+  z-index: 5;
+  animation: comboPop 0.25s ease-out;
+}
+#hud-combo.hidden { display: none; }
+@keyframes comboPop {
+  from { transform: scale(1.7); }
+  to   { transform: scale(1); }
+}
+
 /* ---------- Wave banner ---------- */
 #banner {
   position: fixed;

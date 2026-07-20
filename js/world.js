@@ -271,18 +271,31 @@ export class Boss {
 // Waves
 // ---------------------------------------------------------------------------
 
+// Below the knee the linear value passes through untouched; above it the
+// excess decays exponentially toward knee + span. Difficulty keeps climbing
+// forever without ever going vertical — waves 15+ stay threatening but fair.
+function softCap(v, knee, span) {
+  return v <= knee ? v : knee + span * (1 - Math.exp(-(v - knee) / span));
+}
+
+// Mirror of softCap: values below the knee sink asymptotically to knee - span.
+function softFloor(v, knee, span) {
+  return v >= knee ? v : knee - span * (1 - Math.exp(-(knee - v) / span));
+}
+
 export function waveConfig(n) {
   const bossIndex = n % 5 === 0 ? n / 5 : 0;
-  const count = 6 + n * 2;
+  const count = Math.round(softCap(6 + n * 2, 38, 12));
   return {
     // Boss waves thin out the regular rain so the fight has room to breathe.
     count: bossIndex ? Math.round(count * 0.7) : count,
-    speedFrac: Math.min(0.22, 0.055 + n * 0.011), // × screen height px/s
-    interval: Math.max(0.4, 2.3 - n * 0.16),
-    mirvChance: n >= 3 ? Math.min(0.35, 0.1 + (n - 3) * 0.07) : 0,
-    smartChance: n >= 5 ? Math.min(0.3, 0.1 + (n - 5) * 0.05) : 0,
-    armorChance: n >= 4 ? Math.min(0.18, 0.06 + (n - 4) * 0.03) : 0,
-    bomberChance: n >= 6 ? Math.min(0.08, 0.04 + (n - 6) * 0.01) : 0,
+    speedFrac: softCap(0.055 + n * 0.011, 0.19, 0.1), // × screen height px/s
+    interval: softFloor(2.3 - n * 0.16, 0.55, 0.3),
+    // Asymptotes sum to 0.9, so plain missiles never fully disappear.
+    mirvChance: n >= 3 ? softCap(0.1 + (n - 3) * 0.07, 0.2, 0.12) : 0,
+    smartChance: n >= 5 ? softCap(0.1 + (n - 5) * 0.05, 0.18, 0.1) : 0,
+    armorChance: n >= 4 ? softCap(0.06 + (n - 4) * 0.03, 0.12, 0.08) : 0,
+    bomberChance: n >= 6 ? softCap(0.04 + (n - 6) * 0.01, 0.06, 0.04) : 0,
     boss: bossIndex ? {
       hp: 8 + 4 * (bossIndex - 1),
       salvoEvery: Math.max(2.6, 4.6 - 0.5 * (bossIndex - 1)),

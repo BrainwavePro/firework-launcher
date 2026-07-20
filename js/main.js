@@ -64,6 +64,9 @@ class Game {
     this.boss = null;
     this.bossPending = 0;
     this.stats = { fired: 0, kills: 0 };
+    this.combo = 0;
+    this.comboMult = 1;
+    this.waveDamage = false;
     this.shake = 0;
     this.flash = 0;
     this.whiteFlash = 0;
@@ -238,6 +241,9 @@ class Game {
     this.boss = null;
     this.bossPending = 0;
     this.stats = { fired: 0, kills: 0 };
+    this.combo = 0;
+    this.comboMult = 1;
+    this.ui.setCombo(1);
     this.ps.clear();
     this.selected = 'peony';
     this.ui.setScore(0);
@@ -252,6 +258,7 @@ class Game {
     this.waveCfg = waveConfig(n);
     this.spawnLeft = this.waveCfg.count;
     this.spawnTimer = 0.8;
+    this.waveDamage = false;
     for (const t of this.types) this.ammo[t.id] = t.ammo;
     this.lastFire = {};
     // Batteries are rebuilt between waves; fallen cities stay fallen.
@@ -277,8 +284,33 @@ class Game {
     const cities = this.structures.filter((s) => s.kind === 'city' && s.alive);
     const bonus = cities.length * 50 * this.wave;
     this.addScore(bonus);
+    let sub = `CITY BONUS +${bonus}`;
+    if (!this.waveDamage) {
+      const perfect = 100 * this.wave;
+      this.addScore(perfect);
+      sub = `PERFECT +${perfect} · ${sub}`;
+    }
     this.audio.waveClear();
-    this.ui.banner(`WAVE ${this.wave} CLEARED`, `CITY BONUS +${bonus}`, 2.6);
+    this.ui.banner(`WAVE ${this.wave} CLEARED`, sub, 2.6);
+  }
+
+  // Combo: kills build a score multiplier; losing any structure resets it.
+  _bumpCombo(n) {
+    this.combo += n;
+    const mult = this.combo >= 45 ? 4 : this.combo >= 25 ? 3 : this.combo >= 10 ? 2 : 1;
+    if (mult !== this.comboMult) {
+      this.comboMult = mult;
+      this.ui.setCombo(mult);
+      this.ui.banner(`COMBO ×${mult}`, '', 1.0);
+    }
+  }
+
+  _resetCombo() {
+    this.combo = 0;
+    if (this.comboMult !== 1) {
+      this.comboMult = 1;
+      this.ui.setCombo(1);
+    }
   }
 
   gameOver() {
@@ -459,7 +491,9 @@ class Game {
   bossDown(boss) {
     this.boss = null;
     this.stats.kills += 1;
-    this.addScore(boss.value);
+    this._bumpCombo(5);
+    const bounty = boss.value * this.comboMult;
+    this.addScore(bounty);
     this.audio.bossDown();
     this.whiteFlash = 0.7;
     this.shake = 0.8;
@@ -471,13 +505,15 @@ class Game {
     this.ps.burst(40, boss.x, boss.y, 20, 150, {
       hue: 48, sat: 40, lum: 92, life: 0.6, size: 3, gravity: 30, drag: 0.6, glow: true,
     });
-    this.ui.banner('MOTHERSHIP DOWN', `+${boss.value}`, 2.2);
+    this.ui.banner('MOTHERSHIP DOWN', `+${bounty}`, 2.2);
   }
 
   impact(m) {
     const ref = m.target.ref;
     if (ref && ref.alive) {
       ref.alive = false;
+      this.waveDamage = true;
+      this._resetCombo();
       this.audio.cityHit();
       this.shake = Math.max(this.shake, 0.55);
       this.flash = Math.max(this.flash, 0.5);
@@ -500,9 +536,10 @@ class Game {
     const m = this.missiles[i];
     this.missiles.splice(i, 1);
     this.stats.kills += 1;
+    this._bumpCombo(1);
     const pts = m.value + (burst ? burst.kills * 50 : 0);
     if (burst) burst.kills += 1;
-    this.addScore(pts * this.wave);
+    this.addScore(pts * this.wave * this.comboMult);
     // Sympathetic pop: chain reactions off a destroyed warhead.
     this.bursts.push(new Burst(POP_TYPE, m.x, m.y, this.ps, this.audio));
   }
