@@ -65,7 +65,10 @@ export class EnemyMissile {
     this.value = o.value ?? (this.kind === 'armor' ? 200 : this.kind === 'bomber' ? 300 : 100);
     this.hitBursts = new Set(); // bursts that already damaged this missile
     this.damaged = false;
+    // Body radius for hit tests, matching the drawn warhead size.
+    this.r = this.kind === 'bomber' ? 8 : this.kind === 'armor' ? 4.5 : 3;
     this.x = o.sx; this.y = o.sy;
+    this.px = o.sx; this.py = o.sy; // position last frame (for swept hits)
     this.dist = Math.max(1, Math.hypot(o.target.x - o.sx, o.target.y - o.sy));
     this.traveled = 0;
     this.age = 0;
@@ -78,6 +81,8 @@ export class EnemyMissile {
   }
 
   update(dt) {
+    this.px = this.x;
+    this.py = this.y;
     this.age += dt;
     this.traveled += this.speed * dt;
     const s = Math.min(1, this.traveled / this.dist);
@@ -105,6 +110,14 @@ export class EnemyMissile {
       return 'drop';
     }
     return null;
+  }
+
+  /** Re-aim at the target structure's current position after a resize. */
+  retarget(W, groundY) {
+    if (!this.target.ref) return;
+    this.target.x = this.target.ref.f * W;
+    this.target.y = groundY;
+    this.dist = Math.max(1, Math.hypot(this.target.x - this.sx, this.target.y - this.sy));
   }
 
   draw(ctx) {

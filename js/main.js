@@ -96,6 +96,8 @@ class Game {
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const selH = document.getElementById('selector').offsetHeight || 80;
     this.groundY = this.H - selH - 18;
+    // Re-aim in-flight missiles at their targets' new screen positions.
+    for (const m of this.missiles) m.retarget(this.W, this.groundY);
     this.stars = [];
     const n = Math.floor((this.W * this.H) / 6500);
     for (let i = 0; i < n; i++) {
@@ -520,7 +522,7 @@ class Game {
         for (const b of this.bursts) {
           // Each burst damages a given missile at most once, so lingering
           // blast zones don't melt armored targets in a single frame.
-          if (m.hitBursts.has(b) || !b.hits(m.x, m.y)) continue;
+          if (m.hitBursts.has(b) || !b.hits(m)) continue;
           m.hitBursts.add(b);
           m.hp -= b.type.power ?? 1;
           if (m.hp <= 0) {

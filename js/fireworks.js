@@ -1,7 +1,7 @@
 // Firework type definitions, player shells, and bursts (blast zones).
 // A Burst is a set of timed zones; enemy missiles inside an active zone die.
 
-import { inCircle, inRing } from './collision.js';
+import { inCircle, inRing, segCircle, segRing } from './collision.js';
 
 const TAU = Math.PI * 2;
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -365,6 +365,7 @@ export class Burst {
     this.ps = ps;
     this.audio = audio;
     this.age = 0;
+    this.prevAge = 0;
     this.bounds = bounds;
     this.zones = type.zones(x, y, bounds);
     this.kills = 0;
@@ -372,6 +373,7 @@ export class Burst {
   }
 
   update(dt) {
+    this.prevAge = this.age;
     this.age += dt;
     if (this.type.tick) this.type.tick(this.ps, this, dt);
     let alive = false;
@@ -391,38 +393,48 @@ export class Burst {
     return z.started && this.age < z.delay + z.life;
   }
 
-  hits(px, py) {
+  /** Radius of a grow/ring zone at burst-age t, clamped to its span. */
+  _radiusAt(z, t) {
+    const k = Math.min(1, Math.max(0, (t - z.delay) / z.life));
+    return z.r0 + (z.r1 - z.r0) * k;
+  }
+
+  /**
+   * Swept test against a missile-like target {x, y, px, py, r}: the target's
+   * frame movement px,py → x,y is a segment, so fast missiles can't tunnel
+   * through a thin zone (a Ring edge) between frames.
+   */
+  hits(m) {
+    const pr = m.r || 0;
     for (const z of this.zones) {
       if (!this.zoneActive(z)) continue;
       if (z.kind === 'circle') {
-        if (inCircle(px, py, z.x, z.y, z.r)) return true;
+        if (segCircle(m.px, m.py, m.x, m.y, z.x, z.y, z.r + pr)) return true;
       } else if (z.kind === 'grow') {
-        const t = (this.age - z.delay) / z.life;
-        const r = z.r0 + (z.r1 - z.r0) * t;
-        if (inCircle(px, py, z.x, z.y, r)) return true;
+        if (segCircle(m.px, m.py, m.x, m.y, z.x, z.y, this._radiusAt(z, this.age) + pr)) {
+          return true;
+        }
       } else if (z.kind === 'ring') {
-        const t = (this.age - z.delay) / z.life;
-        const r = z.r0 + (z.r1 - z.r0) * t;
-        if (inRing(px, py, z.x, z.y, r, z.halfWidth)) return true;
+        if (segRing(m.px, m.py, m.x, m.y, z.x, z.y,
+          this._radiusAt(z, this.prevAge), this._radiusAt(z, this.age),
+          z.halfWidth + pr)) {
+          return true;
+        }
       }
     }
     return false;
   }
 
-  /** Like hits(), but for a circular target of radius pr (e.g. the boss). */
+  /** Like hits(), but for a static circular target of radius pr (the boss). */
   hitsCircle(px, py, pr) {
     for (const z of this.zones) {
       if (!this.zoneActive(z)) continue;
       if (z.kind === 'circle') {
         if (inCircle(px, py, z.x, z.y, z.r + pr)) return true;
       } else if (z.kind === 'grow') {
-        const t = (this.age - z.delay) / z.life;
-        const r = z.r0 + (z.r1 - z.r0) * t;
-        if (inCircle(px, py, z.x, z.y, r + pr)) return true;
+        if (inCircle(px, py, z.x, z.y, this._radiusAt(z, this.age) + pr)) return true;
       } else if (z.kind === 'ring') {
-        const t = (this.age - z.delay) / z.life;
-        const r = z.r0 + (z.r1 - z.r0) * t;
-        if (inRing(px, py, z.x, z.y, r, z.halfWidth + pr)) return true;
+        if (inRing(px, py, z.x, z.y, this._radiusAt(z, this.age), z.halfWidth + pr)) return true;
       }
     }
     return false;
