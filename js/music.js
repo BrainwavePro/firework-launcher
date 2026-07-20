@@ -123,8 +123,15 @@ export class MusicEngine {
     this.timer = null;
     this.gain = null;
     this.delay = null;
+    this.volume = 1;
     this.step = 0;
     this.nextTime = 0;
+  }
+
+  /** Music volume 0..1, independent of SFX. */
+  setVolume(v) {
+    this.volume = v;
+    if (this.gain) this.gain.gain.value = v;
   }
 
   get playing() {
@@ -153,7 +160,7 @@ export class MusicEngine {
     if (!ctx) return;
     if (!this.gain) {
       this.gain = ctx.createGain();
-      this.gain.gain.value = 1;
+      this.gain.gain.value = this.volume;
       this.gain.connect(this.audio.master);
       // Dotted-eighth feedback echo; the lead sends into it per note.
       this.delay = ctx.createDelay(1);

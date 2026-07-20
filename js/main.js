@@ -15,6 +15,8 @@ import { bindInput, bindKeyboard } from './input.js';
 const TAU = Math.PI * 2;
 const rand = (a, b) => a + Math.random() * (b - a);
 const MUSIC_KEY = 'fw-launcher-music';
+const VOL_SFX_KEY = 'fw-launcher-vol-sfx';
+const VOL_MUSIC_KEY = 'fw-launcher-vol-music';
 
 // Wave-break banner subtitles the first time an enemy kind appears.
 const ENEMY_INTROS = {
@@ -39,6 +41,14 @@ class Game {
     this.scores = loadScores();
     this.music = new MusicEngine(this.audio);
     this.musicId = localStorage.getItem(MUSIC_KEY) || 'neon';
+    this.vols = {
+      sfx: this._loadVol(VOL_SFX_KEY),
+      music: this._loadVol(VOL_MUSIC_KEY),
+    };
+    this.audio.setSfxVolume(this.vols.sfx);
+    this.music.setVolume(this.vols.music);
+    this.pausedFrom = null;
+    this.wakeLock = null;
     this.selected = 'peony';
     this.ammo = {};
     for (const t of this.types) this.ammo[t.id] = t.ammo;
@@ -73,8 +83,22 @@ class Game {
       selectIndex: (i) => this.select(TYPE_ORDER[i]),
       cycle: (dir) => this.cycleType(dir),
       cycleMusic: () => this.cycleMusic(),
+      pause: () => this.togglePause(),
     });
     document.addEventListener('pointerdown', () => this.audio.ensure(), { capture: true });
+    document.getElementById('btn-pause').addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      this.togglePause();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (this.state === 'playing' || this.state === 'wavebreak') this.pause();
+        else this.music.stop(); // don't serenade a background tab
+      } else {
+        if (this.state === 'menu') this.music.resume();
+        this._updateWakeLock();
+      }
+    });
 
     this.ui.setHigh(best(this.scores));
     this.ui.setScore(0);
@@ -121,9 +145,64 @@ class Game {
       scores: this.scores,
       tracks: TRACKS,
       musicId: this.musicId,
+      vols: this.vols,
       onStart: () => this.startGame(),
       onMusic: (id) => this.setMusic(id),
+      onVolume: (kind, v) => this.setVolume(kind, v),
     });
+  }
+
+  _loadVol(key) {
+    const v = parseFloat(localStorage.getItem(key));
+    return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1;
+  }
+
+  setVolume(kind, v) {
+    this.vols[kind] = v;
+    localStorage.setItem(kind === 'sfx' ? VOL_SFX_KEY : VOL_MUSIC_KEY, String(v));
+    this.audio.ensure();
+    if (kind === 'sfx') {
+      this.audio.setSfxVolume(v);
+      this.audio.zone('pop', true); // audible feedback while sliding
+    } else {
+      this.music.setVolume(v);
+    }
+  }
+
+  togglePause() {
+    if (this.state === 'paused') this.unpause();
+    else if (this.state === 'playing' || this.state === 'wavebreak') this.pause();
+  }
+
+  pause() {
+    this.pausedFrom = this.state;
+    this.state = 'paused';
+    this.music.stop();
+    this.ui.showPause({ onResume: () => this.unpause() });
+    this._updateWakeLock();
+  }
+
+  unpause() {
+    this.state = this.pausedFrom || 'playing';
+    this.pausedFrom = null;
+    this.ui.hideOverlay();
+    this.music.resume();
+    this.last = performance.now(); // don't integrate the paused time
+    this._updateWakeLock();
+  }
+
+  async _updateWakeLock() {
+    const want =
+      (this.state === 'playing' || this.state === 'wavebreak') && !document.hidden;
+    if (want && !this.wakeLock && navigator.wakeLock) {
+      try {
+        this.wakeLock = await navigator.wakeLock.request('screen');
+        this.wakeLock.addEventListener('release', () => { this.wakeLock = null; });
+      } catch { this.wakeLock = null; }
+    } else if (!want && this.wakeLock) {
+      this.wakeLock.release().catch(() => {});
+      this.wakeLock = null;
+    }
   }
 
   setMusic(id) {
@@ -163,7 +242,9 @@ class Game {
     this.selected = 'peony';
     this.ui.setScore(0);
     this.ui.hideOverlay();
+    this.ui.setPauseVisible(true);
     this.startWave(1);
+    this._updateWakeLock();
   }
 
   startWave(n) {
@@ -204,6 +285,8 @@ class Game {
     this.state = 'gameover';
     this.music.stop();
     this.audio.gameOver();
+    this.ui.setPauseVisible(false);
+    this._updateWakeLock();
     setTimeout(() => {
       this.ui.showGameOver({
         score: this.score,
@@ -436,6 +519,7 @@ class Game {
   }
 
   update(dt) {
+    if (this.state === 'paused') return;
     this.ps.update(dt);
     this.shake = Math.max(0, this.shake - dt);
     this.flash = Math.max(0, this.flash - dt * 1.4);

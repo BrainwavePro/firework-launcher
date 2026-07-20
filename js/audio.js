@@ -1,9 +1,11 @@
-// Procedural Web Audio sound effects — no audio assets needed.
+﻿// Procedural Web Audio sound effects — no audio assets needed.
 
 export class AudioFX {
   constructor() {
     this.ctx = null;
     this.master = null;
+    this.sfx = null;      // SFX-only bus (music has its own gain into master)
+    this.sfxVol = 1;
     this.noiseBuf = null;
   }
 
@@ -16,12 +18,21 @@ export class AudioFX {
       this.master = this.ctx.createGain();
       this.master.gain.value = 0.5;
       this.master.connect(this.ctx.destination);
+      this.sfx = this.ctx.createGain();
+      this.sfx.gain.value = this.sfxVol;
+      this.sfx.connect(this.master);
       const len = this.ctx.sampleRate;
       this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
       const d = this.noiseBuf.getChannelData(0);
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     }
     if (this.ctx.state === 'suspended') this.ctx.resume();
+  }
+
+  /** SFX volume 0..1 (music is controlled by MusicEngine.setVolume). */
+  setSfxVolume(v) {
+    this.sfxVol = v;
+    if (this.sfx) this.sfx.gain.value = v;
   }
 
   _noise(dur, filterType, f0, f1, vol, delay = 0) {
@@ -37,7 +48,7 @@ export class AudioFX {
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(vol, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    src.connect(filt).connect(g).connect(this.master);
+    src.connect(filt).connect(g).connect(this.sfx);
     src.start(t);
     src.stop(t + dur);
   }
@@ -52,7 +63,7 @@ export class AudioFX {
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(vol, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    osc.connect(g).connect(this.master);
+    osc.connect(g).connect(this.sfx);
     osc.start(t);
     osc.stop(t + dur);
   }

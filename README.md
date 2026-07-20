@@ -39,11 +39,15 @@ dependencies, zero build step. Installable to your home screen as a PWA.
   fastest. Huge score bounty when it falls.
 - Game over when every city has fallen. Make the **top-10 leaderboard** and
   enter your initials, arcade style — scores persist on your device.
+- **Pause** any time: the ❚❚ button, **P**, or **Esc** — and the game
+  auto-pauses when you switch apps. The screen stays awake while defending.
 - **Keyboard shortcuts** (desktop): **1–9** select a firework, **←/→** (or
-  **Q/E**) cycle through unlocked types, **M** cycles the music.
+  **Q/E**) cycle through unlocked types, **M** cycles the music,
+  **P**/**Esc** pauses.
 - **Retro music**: three procedurally generated chiptune tracks — *Neon
   Siege*, *Quarter Muncher*, *Starlight Vigil* — pick one (or silence) from
-  the menu. Synthesized live with Web Audio; no audio files.
+  the menu, with separate SFX and music volume sliders. Synthesized live
+  with Web Audio; no audio files.
 
 ## Run it
 

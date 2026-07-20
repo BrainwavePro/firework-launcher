@@ -83,14 +83,24 @@ export class UI {
     return `<div class="mus-row" id="mus-row">${btns}</div>`;
   }
 
-  showMenu({ scores, tracks, musicId, onStart, onMusic }) {
+  _volRows(vols) {
+    const row = (kind, label, v) =>
+      `<label class="vol-row">${label}
+        <input type="range" class="vol-slider" data-vol="${kind}"
+          min="0" max="100" value="${Math.round(v * 100)}">
+      </label>`;
+    return `<div class="vol-rows">${row('sfx', 'SFX', vols.sfx)}${row('music', 'MUSIC', vols.music)}</div>`;
+  }
+
+  showMenu({ scores, tracks, musicId, vols, onStart, onMusic, onVolume }) {
     this.overlayEl.innerHTML = `
       <h1>FIREWORK<br>LAUNCHER</h1>
       <p>Missiles are falling on your cities.<br>
       Fight back with <strong>fireworks</strong>.</p>
-      <p>Tap the sky to intercept. Keys 1–9 switch fireworks, M cycles music.</p>
+      <p>Tap the sky to intercept. Keys 1–9 switch fireworks, M cycles music, P pauses.</p>
       <button class="big-btn" id="btn-start">DEFEND</button>
       ${this._musicRow(tracks, musicId)}
+      ${this._volRows(vols)}
       ${this._scoreRows(scores)}`;
     this.overlayEl.classList.remove('hidden');
     document.getElementById('btn-start')
@@ -103,6 +113,26 @@ export class UI {
         b.classList.toggle('selected', b === btn);
       }
     });
+    for (const s of this.overlayEl.querySelectorAll('.vol-slider')) {
+      s.addEventListener('input', () => onVolume(s.dataset.vol, s.value / 100));
+      // Sliders live inside the tap-to-fire page; don't let drags bubble.
+      s.addEventListener('pointerdown', (e) => e.stopPropagation());
+    }
+  }
+
+  showPause({ onResume }) {
+    this.overlayEl.innerHTML = `
+      <h2>PAUSED</h2>
+      <p>The missiles wait for no one… except now.</p>
+      <button class="big-btn" id="btn-resume">RESUME</button>
+      <p class="entry-hint">P or ESC also resumes</p>`;
+    this.overlayEl.classList.remove('hidden');
+    document.getElementById('btn-resume')
+      .addEventListener('pointerdown', onResume, { once: true });
+  }
+
+  setPauseVisible(visible) {
+    document.getElementById('btn-pause').classList.toggle('hidden', !visible);
   }
 
   showGameOver({ score, wave, scores, stats, canEnter, onSave, onRestart }) {
