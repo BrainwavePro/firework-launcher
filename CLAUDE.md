@@ -9,8 +9,8 @@ A mobile-first Missile Command variant played with fireworks: plain HTML5 Canvas
 ## Commands
 
 ```sh
-python -m http.server 8000     # run locally, then open http://localhost:8000
-node --test tests/             # unit tests (pure-module geometry/score/wave math)
+python -m http.server 8000         # run locally, then open http://localhost:8000
+node --test "tests/*.test.js"      # unit tests (pure-module geometry/score/wave math)
 ```
 
 - Best tested in a mobile viewport. The service worker registers only on https, so local dev never caches — no cache-busting needed while developing.
@@ -32,7 +32,7 @@ The core design idea: **gameplay hitboxes and visuals are decoupled.**
 
 ## Gotchas
 
-- **Bump the `sw.js` cache name** (`fw-launcher-v4` → `v5`, …) in every shipped change, and add any new files to its `ASSETS` list — otherwise players keep running stale code offline-first.
+- **Bump the `sw.js` cache name** (`fw-launcher-v5` → `v6`, …) in every shipped change, and add any new files to its `ASSETS` list — otherwise players keep running stale code offline-first.
 - All game coordinates are **CSS pixels**; devicePixelRatio is handled once via `ctx.setTransform` in `Game.resize()`. Never multiply by dpr elsewhere.
 - `groundY` is derived from the selector bar's rendered DOM height, so canvas layout depends on the DOM having settled.
 - The README's firework table and code-layout block are kept in sync with the code by convention — update them when player-facing behavior changes.

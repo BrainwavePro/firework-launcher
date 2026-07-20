@@ -766,7 +766,18 @@ const game = new Game(document.getElementById('game'));
 // Debug/testing hook.
 window.__fw = { game, types: FIREWORK_TYPES };
 
-// PWA
+// PWA — and tell the player when a fresh version has been cached, instead of
+// silently serving stale code until their second visit.
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
+  navigator.serviceWorker.register('sw.js').then((reg) => {
+    reg.addEventListener('updatefound', () => {
+      const worker = reg.installing;
+      if (!worker) return;
+      worker.addEventListener('statechange', () => {
+        if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+          game.ui.banner('UPDATE READY', 'RELOAD TO GET THE NEW VERSION', 4);
+        }
+      });
+    });
+  }).catch(() => {});
 }
