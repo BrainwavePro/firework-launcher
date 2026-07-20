@@ -61,7 +61,13 @@ class Game {
     this.stars = [];
 
     this.resize();
-    window.addEventListener('resize', () => this.resize());
+    // Mobile browsers fire resize with transient dimensions (toolbar hide,
+    // rotation); re-measure once more after the events settle.
+    window.addEventListener('resize', () => {
+      this.resize();
+      clearTimeout(this._resizeTimer);
+      this._resizeTimer = setTimeout(() => this.resize(), 250);
+    });
     bindInput(canvas, (x, y) => this.tap(x, y));
     bindKeyboard({
       selectIndex: (i) => this.select(TYPE_ORDER[i]),
@@ -175,7 +181,7 @@ class Game {
       ? `NEW FIREWORK UNLOCKED: ${unlockedNow.name.toUpperCase()}`
       : ENEMY_INTROS[n] || '';
     if (this.waveCfg.boss) {
-      sub = 'MOTHERSHIP DETECTED';
+      sub = sub ? `MOTHERSHIP DETECTED · ${sub}` : 'MOTHERSHIP DETECTED';
       this.bossPending = 2;
       this.audio.bossAlarm();
     }
