@@ -1,7 +1,7 @@
 // Firework type definitions, player shells, and bursts (blast zones).
 // A Burst is a set of timed zones; enemy missiles inside an active zone die.
 
-import { inCircle, inRing } from './collision.js';
+import { inCircle, inRing, segCircle, segRing } from './collision.js';
 
 const TAU = Math.PI * 2;
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -154,7 +154,7 @@ export const FIREWORK_TYPES = {
 
   chrys: {
     id: 'chrys', name: 'Chrys', hue: 265,
-    cooldown: 1.6, ammo: 2, unlockWave: 5, sound: 'chrysboom',
+    cooldown: 1.6, ammo: 2, unlockWave: 5, sound: 'chrysboom', power: 2,
     desc: 'Giant layered bloom — huge radius',
     zones(x, y) {
       return [zone('circle', x, y, { r: 135, delay: 0, life: 1.25 })];
@@ -197,9 +197,71 @@ export const FIREWORK_TYPES = {
     },
   },
 
+  curtain: {
+    id: 'curtain', name: 'Curtain', hue: 150,
+    cooldown: 1.1, ammo: 3, unlockWave: 6, sound: 'curtain',
+    desc: 'Horizontal wall of strobing green fire',
+    zones(x, y, bounds) {
+      const W = bounds?.W ?? 900;
+      const zs = [];
+      // Seven cells rippling outward from the tap point, clamped on-screen.
+      for (let i = -3; i <= 3; i++) {
+        const zx = Math.min(W - 30, Math.max(30, x + i * 56));
+        zs.push(zone('circle', zx, y, { r: 36, delay: Math.abs(i) * 0.09, life: 1.5 }));
+      }
+      return zs;
+    },
+    onZone(ps, z) {
+      ps.burst(20, z.x, z.y, 15, 130, {
+        hue: this.hue, life: rand(0.9, 1.4), size: 1.8,
+        gravity: 30, drag: 0.7, flicker: 0.7, glow: true,
+      });
+    },
+  },
+
+  seeker: {
+    id: 'seeker', name: 'Seeker', hue: 215,
+    cooldown: 1.2, ammo: 3, unlockWave: 8, sound: 'seeker',
+    desc: 'Three homing motes hunt down missiles',
+    zones(x, y) {
+      return [0, 1, 2].map((i) =>
+        zone('circle', x, y, { r: 24, delay: i * 0.12, life: 2.4 }));
+    },
+    onZone(ps, z) {
+      ps.burst(14, z.x, z.y, 20, 90, {
+        hue: this.hue, life: 0.4, size: 2, gravity: 20, drag: 0.6, glow: true,
+      });
+    },
+    // Each active zone steers toward the nearest live target at ≤250 px/s.
+    tick(ps, burst, dt) {
+      const targets = burst.bounds?.getTargets?.() ?? [];
+      for (const z of burst.zones) {
+        if (!burst.zoneActive(z)) continue;
+        let best = null;
+        let bd = Infinity;
+        for (const m of targets) {
+          const d = Math.hypot(m.x - z.x, m.y - z.y);
+          if (d < bd) { bd = d; best = m; }
+        }
+        if (best && bd > 0.5) {
+          const k = Math.min(1, (250 * dt) / bd);
+          z.x += (best.x - z.x) * k;
+          z.y += (best.y - z.y) * k;
+        } else if (!best) {
+          z.y -= 40 * dt; // empty sky: drift up and fizzle
+        }
+        ps.spawn({
+          x: z.x, y: z.y, vx: rand(-10, 10), vy: rand(-10, 10),
+          hue: this.hue, sat: 70, lum: 80, life: 0.35, size: 2.2,
+          gravity: 0, drag: 0.5, glow: true,
+        });
+      }
+    },
+  },
+
   diablo: {
     id: 'diablo', name: 'Diablo', hue: 12,
-    cooldown: 2, ammo: 1, unlockWave: 10, sound: 'boom',
+    cooldown: 2, ammo: 1, unlockWave: 10, sound: 'boom', power: 4,
     desc: 'A tiny boom. Then the sun.',
     zones(x, y, bounds) {
       const W = bounds?.W ?? 900;
@@ -269,7 +331,9 @@ export const FIREWORK_TYPES = {
   },
 };
 
-export const TYPE_ORDER = ['peony', 'willow', 'ring', 'palm', 'crackle', 'chrys', 'diablo'];
+export const TYPE_ORDER = [
+  'peony', 'willow', 'ring', 'palm', 'crackle', 'chrys', 'curtain', 'seeker', 'diablo',
+];
 
 // Small sympathetic pop left behind by a destroyed missile (chain reactions).
 export const POP_TYPE = {
@@ -301,12 +365,15 @@ export class Burst {
     this.ps = ps;
     this.audio = audio;
     this.age = 0;
+    this.prevAge = 0;
+    this.bounds = bounds;
     this.zones = type.zones(x, y, bounds);
     this.kills = 0;
     this.done = false;
   }
 
   update(dt) {
+    this.prevAge = this.age;
     this.age += dt;
     if (this.type.tick) this.type.tick(this.ps, this, dt);
     let alive = false;
@@ -326,19 +393,48 @@ export class Burst {
     return z.started && this.age < z.delay + z.life;
   }
 
-  hits(px, py) {
+  /** Radius of a grow/ring zone at burst-age t, clamped to its span. */
+  _radiusAt(z, t) {
+    const k = Math.min(1, Math.max(0, (t - z.delay) / z.life));
+    return z.r0 + (z.r1 - z.r0) * k;
+  }
+
+  /**
+   * Swept test against a missile-like target {x, y, px, py, r}: the target's
+   * frame movement px,py → x,y is a segment, so fast missiles can't tunnel
+   * through a thin zone (a Ring edge) between frames.
+   */
+  hits(m) {
+    const pr = m.r || 0;
     for (const z of this.zones) {
       if (!this.zoneActive(z)) continue;
       if (z.kind === 'circle') {
-        if (inCircle(px, py, z.x, z.y, z.r)) return true;
+        if (segCircle(m.px, m.py, m.x, m.y, z.x, z.y, z.r + pr)) return true;
       } else if (z.kind === 'grow') {
-        const t = (this.age - z.delay) / z.life;
-        const r = z.r0 + (z.r1 - z.r0) * t;
-        if (inCircle(px, py, z.x, z.y, r)) return true;
+        if (segCircle(m.px, m.py, m.x, m.y, z.x, z.y, this._radiusAt(z, this.age) + pr)) {
+          return true;
+        }
       } else if (z.kind === 'ring') {
-        const t = (this.age - z.delay) / z.life;
-        const r = z.r0 + (z.r1 - z.r0) * t;
-        if (inRing(px, py, z.x, z.y, r, z.halfWidth)) return true;
+        if (segRing(m.px, m.py, m.x, m.y, z.x, z.y,
+          this._radiusAt(z, this.prevAge), this._radiusAt(z, this.age),
+          z.halfWidth + pr)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /** Like hits(), but for a static circular target of radius pr (the boss). */
+  hitsCircle(px, py, pr) {
+    for (const z of this.zones) {
+      if (!this.zoneActive(z)) continue;
+      if (z.kind === 'circle') {
+        if (inCircle(px, py, z.x, z.y, z.r + pr)) return true;
+      } else if (z.kind === 'grow') {
+        if (inCircle(px, py, z.x, z.y, this._radiusAt(z, this.age) + pr)) return true;
+      } else if (z.kind === 'ring') {
+        if (inRing(px, py, z.x, z.y, this._radiusAt(z, this.age), z.halfWidth + pr)) return true;
       }
     }
     return false;

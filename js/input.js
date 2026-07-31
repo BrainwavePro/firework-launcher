@@ -16,10 +16,10 @@ export function bindInput(canvas, onTap) {
 }
 
 /**
- * Keyboard shortcuts: 1-7 select a firework, ←/Q and →/E cycle through
- * unlocked types, M cycles the music track.
+ * Keyboard shortcuts: 1-9 select a firework, ←/Q and →/E cycle through
+ * unlocked types, M cycles the music track, P/Esc toggles pause.
  */
-export function bindKeyboard({ selectIndex, cycle, cycleMusic }) {
+export function bindKeyboard({ selectIndex, cycle, cycleMusic, pause }) {
   document.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT') return; // typing initials
     const k = e.key.toLowerCase();
@@ -27,6 +27,7 @@ export function bindKeyboard({ selectIndex, cycle, cycleMusic }) {
     else if (e.key === 'ArrowLeft' || k === 'q') cycle(-1);
     else if (e.key === 'ArrowRight' || k === 'e') cycle(1);
     else if (k === 'm') cycleMusic();
+    else if (k === 'p' || e.key === 'Escape') pause();
     else return;
     e.preventDefault();
   });

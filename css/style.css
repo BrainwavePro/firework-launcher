@@ -53,6 +53,45 @@ html, body {
 #hud-wave  { font-size: 14px; color: var(--dim); }
 #hud-high  { font-size: 13px; color: var(--dim); min-width: 90px; text-align: right; }
 
+/* ---------- Pause button ---------- */
+#btn-pause {
+  position: fixed;
+  top: calc(40px + var(--safe-top));
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--dim);
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: -0.05em;
+  cursor: pointer;
+  z-index: 6;
+}
+#btn-pause.hidden { display: none; }
+
+/* ---------- Combo badge ---------- */
+#hud-combo {
+  position: fixed;
+  left: 14px;
+  top: calc(40px + var(--safe-top));
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #ffd77a;
+  text-shadow: 0 0 12px rgba(255, 200, 100, 0.75);
+  pointer-events: none;
+  z-index: 5;
+  animation: comboPop 0.25s ease-out;
+}
+#hud-combo.hidden { display: none; }
+@keyframes comboPop {
+  from { transform: scale(1.7); }
+  to   { transform: scale(1); }
+}
+
 /* ---------- Wave banner ---------- */
 #banner {
   position: fixed;
@@ -111,16 +150,6 @@ html, body {
 }
 .fw-btn:active { transform: scale(0.94); }
 
-.fw-btn { position: relative; }
-.fw-key {
-  position: absolute;
-  top: 3px;
-  right: 5px;
-  font-size: 8px;
-  color: var(--dim);
-  opacity: 0.7;
-}
-
 .fw-key {
   position: absolute;
   top: 3px;
@@ -141,6 +170,12 @@ html, body {
 
 .fw-name { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 8.5px; letter-spacing: 0; }
 .fw-ammo { font-size: 10px; color: var(--dim); font-variant-numeric: tabular-nums; }
+
+/* Nine buttons on a narrow phone: shave the name so nothing ellipsizes. */
+@media (max-width: 420px) {
+  .fw-name { font-size: 7px; }
+  .fw-btn { padding-left: 1px; padding-right: 1px; }
+}
 
 .fw-btn.selected {
   border-color: var(--c);
@@ -198,100 +233,6 @@ html, body {
 }
 .big-btn:active { transform: scale(0.95); }
 
-#overlay { overflow-y: auto; }
-
-/* ---------- Music picker ---------- */
-.mus-row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 20px;
-}
-.mus-btn {
-  padding: 7px 12px;
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text);
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  cursor: pointer;
-}
-.mus-btn.selected {
-  border-color: #ffd77a;
-  color: #ffd77a;
-  box-shadow: 0 0 10px rgba(255, 200, 100, 0.4);
-}
-
-/* ---------- Leaderboard ---------- */
-.scores {
-  margin-top: 18px;
-  min-width: 240px;
-  font-variant-numeric: tabular-nums;
-}
-.scores-title {
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.22em;
-  color: var(--dim);
-  margin-bottom: 8px;
-}
-.score-row {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-  padding: 3px 0;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-.score-row.me { color: #ffd77a; text-shadow: 0 0 10px rgba(255, 200, 100, 0.6); }
-.sr-rank { width: 20px; color: var(--dim); text-align: right; }
-.sr-init { width: 46px; text-align: left; }
-.sr-score { width: 76px; text-align: right; }
-.sr-wave { width: 36px; color: var(--dim); text-align: left; }
-
-/* ---------- Initials entry ---------- */
-.initials-row {
-  display: flex;
-  gap: 8px;
-  margin-top: 16px;
-  align-items: center;
-}
-#initials {
-  width: 110px;
-  padding: 10px 0;
-  text-align: center;
-  font-family: inherit;
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: 0.35em;
-  text-transform: uppercase;
-  color: #ffd77a;
-  background: rgba(10, 14, 32, 0.9);
-  border: 1px solid #ffd77a;
-  border-radius: 10px;
-  outline: none;
-  caret-color: #ffd77a;
-}
-.save-btn {
-  padding: 12px 20px;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  color: #0b0e1a;
-  background: linear-gradient(180deg, #ffd77a, #ff9a4d);
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
-}
-.entry-hint { font-size: 13px !important; color: #ffd77a !important; }
-
 /* ---------- Music picker ---------- */
 .mus-row {
   display: flex;
@@ -317,6 +258,29 @@ html, body {
   border-color: #ffd77a;
   color: #ffd77a;
   box-shadow: 0 0 12px rgba(255, 200, 100, 0.45);
+}
+
+/* ---------- Volume sliders ---------- */
+.vol-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+.vol-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(240px, 70vw);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--dim);
+}
+.vol-slider {
+  flex: 1;
+  accent-color: #ffd77a;
+  touch-action: none;
 }
 
 /* ---------- Leaderboard ---------- */
@@ -347,7 +311,7 @@ html, body {
   color: #ffd77a;
   box-shadow: 0 0 10px rgba(255, 200, 100, 0.25);
 }
-.sr-rank { width: 20px; color: var(--dim); }
+.sr-rank { width: 20px; color: var(--dim); text-align: right; }
 .sr-init { width: 52px; text-align: left; }
 .sr-score { flex: 1; text-align: right; }
 .sr-wave { width: 44px; text-align: right; color: var(--dim); }
